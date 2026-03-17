@@ -19,8 +19,7 @@ import json
 import time
 import random
 from google import genai
-from google.genai import types
-from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable, GoogleAPIError
+from google.genai import types, errors as genai_errors
 from supabase import create_client
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -109,25 +108,21 @@ def call_gemma_with_retry(client: genai.Client, title: str, content: str) -> dic
             # Model returned non-JSON - no point retrying, mark error
             raise
 
-        except ResourceExhausted:
-            # 429 - rate limit hit
-            if attempt == MAX_RETRIES:
+        except genai_errors.ClientError as e:
+            # 429 rate limit or other 4xx
+            if attempt == MAX_RETRIES or "429" not in str(e):
                 raise
             wait = (2 ** attempt) * 5 + random.uniform(0, 2)
             print(f"  Rate limit hit (attempt {attempt}/{MAX_RETRIES}), waiting {wait:.1f}s...")
             time.sleep(wait)
 
-        except ServiceUnavailable:
-            # 503 - transient server error
+        except genai_errors.ServerError:
+            # 503 or other 5xx - transient
             if attempt == MAX_RETRIES:
                 raise
             wait = (2 ** attempt) * 3 + random.uniform(0, 2)
-            print(f"  Service unavailable (attempt {attempt}/{MAX_RETRIES}), waiting {wait:.1f}s...")
+            print(f"  Server error (attempt {attempt}/{MAX_RETRIES}), waiting {wait:.1f}s...")
             time.sleep(wait)
-
-        except GoogleAPIError:
-            # Other API errors - don't retry
-            raise
 
 
 def check_daily_budget(db, limit: int = 1000) -> int:
