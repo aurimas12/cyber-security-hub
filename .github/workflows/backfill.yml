@@ -1,0 +1,28 @@
+name: Backfill Failed Articles
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Which stage to backfill?'
+        required: true
+        type: choice
+        options:
+          - parser       # resets raw_articles status=error/processing → pending
+          - extractors   # resets parsed_articles *_status=error → pending
+
+jobs:
+  backfill:
+    name: Backfill ${{ inputs.stage }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python scripts/backfill.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BACKFILL_STAGE: ${{ inputs.stage }}
