@@ -1,6 +1,8 @@
 name: Backfill Failed Articles
 
 on:
+  schedule:
+    - cron: '30 1 * * *'   # every day at 01:30 UTC (after midnight pipeline finishes)
   workflow_dispatch:
     inputs:
       stage:
@@ -8,21 +10,23 @@ on:
         required: true
         type: choice
         options:
-          - parser       # resets raw_articles status=error/processing → pending
-          - extractors   # resets parsed_articles *_status=error → pending
+          - both        # default: resets all errors
+          - parser      # resets raw_articles status=error/processing → pending
+          - extractors  # resets parsed_articles *_status=error → pending
 
 jobs:
   backfill:
-    name: Backfill ${{ inputs.stage }}
+    name: Backfill errors
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
       - run: pip install -r requirements.txt
       - run: python scripts/backfill.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          BACKFILL_STAGE: ${{ inputs.stage }}
+          BACKFILL_STAGE: ${{ inputs.stage || 'both' }}
