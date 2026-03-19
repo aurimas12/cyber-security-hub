@@ -31,19 +31,38 @@ MODEL        = "gemma-3-12b-it"
 BATCH_SIZE        = 20    # articles per run (80/day at 4 runs → well under 1000 RPD)
 DELAY_BETWEEN_REQ = 2.5   # seconds between requests → max 24 RPM (safe under 30 RPM)
 MAX_RETRIES       = 4     # max attempts per article
-CONTENT_CHAR_LIMIT = 5000 # ~1250 tokens, leaves room for prompt + response
+CONTENT_CHAR_LIMIT = 6000 # ~1500 tokens, leaves room for prompt + response
 
-PROMPT = """Analyze this cybersecurity article and return ONLY a valid JSON object with exactly these keys.
-No markdown, no explanation, just raw JSON.
+# Valid enum values — kept separate so the schema stays readable
+MITRE_TACTICS = (
+    "Initial Access|Execution|Persistence|Privilege Escalation|"
+    "Defense Evasion|Credential Access|Discovery|Lateral Movement|"
+    "Collection|Command and Control|Exfiltration|Impact"
+)
+
+PROMPT = """You are a cybersecurity analyst. Analyze the article below and return ONLY a valid JSON object.
+No markdown, no explanation, no prose — just raw JSON.
+
+Field constraints:
+- severity: one of critical, high, medium, low — or null
+- cvss_score: float (e.g. 9.8) or null
+- mitre_id: format T1234 or T1234.001 — or null
+- mitre_tactic: one of ({mitre_tactics}) — or null
+- category: one of patch, config, monitoring, training, architecture
+- priority: one of immediate, short-term, long-term
+- applies_to: one or more of sysadmin, developer, security-team, network-admin, management
+- motivation: one of espionage, financial, hacktivism, unknown
+- sector: one of healthcare, finance, government, energy, technology, education, critical-infrastructure, other
+- attack_type: one of ransomware, phishing, supply-chain, zero-day, ddos, data-breach, other
 
 {{
-  "summary": "2-3 sentence summary",
+  "summary": "2-3 sentence summary of the article",
   "vulnerabilities": [
     {{
       "cve_id": "CVE-YYYY-NNNNN or null",
       "description": "what the vulnerability is",
-      "affected_products": ["product1"],
-      "severity": "critical|high|medium|low or null",
+      "affected_products": ["product1", "product2"],
+      "severity": "critical",
       "cvss_score": 9.8,
       "patch_available": true,
       "patch_url": "url or null"
@@ -52,8 +71,8 @@ No markdown, no explanation, just raw JSON.
   "techniques": [
     {{
       "name": "technique name",
-      "mitre_id": "T1234.001 or null",
-      "mitre_tactic": "Initial Access|Execution|Persistence|Privilege Escalation|Defense Evasion|Credential Access|Discovery|Lateral Movement|Collection|Command and Control|Exfiltration|Impact or null",
+      "mitre_id": "T1078 or null",
+      "mitre_tactic": "Initial Access or null",
       "description": "how it works",
       "threat_actor": "group name or null"
     }}
@@ -61,10 +80,28 @@ No markdown, no explanation, just raw JSON.
   "recommendations": [
     {{
       "text": "what to do",
-      "category": "patch|config|monitoring|training|architecture",
-      "priority": "immediate|short-term|long-term",
-      "applies_to": ["sysadmin"],
+      "category": "patch",
+      "priority": "immediate",
+      "applies_to": ["sysadmin", "security-team"],
       "related_cves": ["CVE-YYYY-NNNNN"]
+    }}
+  ],
+  "threat_actors": [
+    {{
+      "name": "group name",
+      "aliases": ["alias1", "alias2"],
+      "origin_country": "Russia or null",
+      "targeted_sectors": ["government", "finance"],
+      "motivation": "espionage"
+    }}
+  ],
+  "incidents": [
+    {{
+      "organization": "company or agency name or null",
+      "sector": "government",
+      "attack_type": "ransomware",
+      "data_compromised": ["credentials", "PII"],
+      "incident_date": "YYYY-MM-DD or null"
     }}
   ]
 }}
@@ -90,7 +127,7 @@ def call_gemma_with_retry(client: genai.Client, title: str, content: str) -> dic
 
     Retry schedule (seconds): 5, 10, 20, 40 (+ jitter)
     """
-    prompt = PROMPT.format(title=title, content=content[:CONTENT_CHAR_LIMIT])
+    prompt = PROMPT.format(title=title, content=content[:CONTENT_CHAR_LIMIT], mitre_tactics=MITRE_TACTICS)
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -105,8 +142,11 @@ def call_gemma_with_retry(client: genai.Client, title: str, content: str) -> dic
             return json.loads(clean_json(response.text))
 
         except json.JSONDecodeError:
-            # Model returned non-JSON - no point retrying, mark error
-            raise
+            # Model returned non-JSON — retry once, then give up
+            if attempt == MAX_RETRIES or attempt > 1:
+                raise
+            print(f"  JSON parse failed (attempt {attempt}/{MAX_RETRIES}), retrying...")
+            time.sleep(2)
 
         except genai_errors.ClientError as e:
             # 429 rate limit or other 4xx

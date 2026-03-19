@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        script: [vuln_extractor, methodology_extractor, strategy_extractor]
+        script: [vuln_extractor, methodology_extractor, strategy_extractor, threat_actor_extractor, incident_extractor]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

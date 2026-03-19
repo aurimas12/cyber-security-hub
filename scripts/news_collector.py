@@ -16,14 +16,28 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 RSS_FEEDS = [
+    # ── General cyber news ──────────────────────────────────────────────────────
     {"name": "krebs",            "url": "https://krebsonsecurity.com/feed/"},
     {"name": "bleepingcomputer", "url": "https://www.bleepingcomputer.com/feed/"},
     {"name": "hackernews",       "url": "https://feeds.feedburner.com/TheHackersNews"},
-    {"name": "cisa_alerts",      "url": "https://www.cisa.gov/cybersecurity-advisories/advisories.xml"},
     {"name": "schneier",         "url": "https://www.schneier.com/feed/atom/"},
     {"name": "darkreading",      "url": "https://www.darkreading.com/rss.xml"},
+    {"name": "securityweek",     "url": "https://feeds.feedburner.com/securityweek"},
+    {"name": "cyberscoop",       "url": "https://cyberscoop.com/feed/"},
+
+    # ── Official advisories & vulnerabilities ───────────────────────────────────
+    {"name": "cisa_alerts",      "url": "https://www.cisa.gov/cybersecurity-advisories/advisories.xml"},
     {"name": "sans_isc",         "url": "https://isc.sans.edu/rssfeed_full.xml"},
     {"name": "nvd_cve",          "url": "https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml"},
+    {"name": "exploit_db",       "url": "https://www.exploit-db.com/rss.xml"},
+    {"name": "github_advisories","url": "https://github.com/advisories.atom"},
+
+    # ── Vendor threat research (TTP, campaigns, malware analysis) ───────────────
+    {"name": "unit42",           "url": "https://unit42.paloaltonetworks.com/feed/"},
+    {"name": "talos",            "url": "https://blog.talosintelligence.com/feeds/posts/default"},
+    {"name": "mandiant",         "url": "https://www.mandiant.com/resources/rss.xml"},
+    {"name": "securelist",       "url": "https://securelist.com/feed/"},
+    {"name": "sophos_xops",      "url": "https://news.sophos.com/en-us/category/threat-research/feed/"},
 ]
 
 

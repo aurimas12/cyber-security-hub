@@ -32,6 +32,8 @@ create table parsed_articles (
     vuln_status     text not null default 'pending',
     method_status   text not null default 'pending',
     strategy_status text not null default 'pending',
+    actor_status    text not null default 'pending',
+    incident_status text not null default 'pending',
     parsed_at       timestamptz not null default now()
 );
 
@@ -91,3 +93,38 @@ create table strategies (
 
 create index on strategies (category);
 create index on strategies (parsed_article_id);
+
+-- -------------------------------------------------------
+
+create table threat_actors (
+    id                  uuid primary key default gen_random_uuid(),
+    parsed_article_id   uuid not null references parsed_articles(id),
+    name                text not null,
+    aliases             text[],
+    origin_country      text,
+    targeted_sectors    text[],
+    motivation          text,
+    extracted_at        timestamptz not null default now()
+);
+
+create index on threat_actors (name);
+create index on threat_actors (origin_country);
+create index on threat_actors (parsed_article_id);
+
+-- -------------------------------------------------------
+
+create table incidents (
+    id                  uuid primary key default gen_random_uuid(),
+    parsed_article_id   uuid not null references parsed_articles(id),
+    organization        text,
+    sector              text,
+    attack_type         text,
+    data_compromised    text[],
+    incident_date       date,
+    extracted_at        timestamptz not null default now()
+);
+
+create index on incidents (attack_type);
+create index on incidents (sector);
+create index on incidents (incident_date desc);
+create index on incidents (parsed_article_id);
