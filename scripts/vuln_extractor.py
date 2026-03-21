@@ -1,7 +1,7 @@
 """
 vuln_extractor.py
 -----------------
-ONE JOB: Read claude_analysis.vulnerabilities from parsed_articles,
+ONE JOB: Read ai_analysis.vulnerabilities from parsed_articles,
 write one row per vulnerability into the vulnerabilities table.
 No API calls - pure data transformation.
 """
@@ -20,8 +20,9 @@ def main():
 
     articles = (
         db.table("parsed_articles")
-        .select("id, claude_analysis")
+        .select("id, ai_analysis")
         .eq("vuln_status", "pending")
+        .order("parsed_at")
         .limit(BATCH_SIZE)
         .execute()
         .data
@@ -31,7 +32,7 @@ def main():
 
     for article in articles:
         article_id = article["id"]
-        vulns = article["claude_analysis"].get("vulnerabilities", [])
+        vulns = article["ai_analysis"].get("vulnerabilities", [])
 
         try:
             if vulns:

@@ -33,7 +33,7 @@ def backfill_parser(db):
 
 
 def backfill_extractors(db):
-    for col in ("vuln_status", "method_status", "strategy_status"):
+    for col in ("vuln_status", "method_status", "strategy_status", "actor_status", "incident_status"):
         result = (
             db.table("parsed_articles")
             .update({col: "pending"})

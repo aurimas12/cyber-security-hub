@@ -28,7 +28,6 @@ RSS_FEEDS = [
     # ── Official advisories & vulnerabilities ───────────────────────────────────
     {"name": "cisa_alerts",      "url": "https://www.cisa.gov/cybersecurity-advisories/advisories.xml"},
     {"name": "sans_isc",         "url": "https://isc.sans.edu/rssfeed_full.xml"},
-    {"name": "nvd_cve",          "url": "https://nvd.nist.gov/feeds/xml/cve/misc/nvd-rss.xml"},
     {"name": "exploit_db",       "url": "https://www.exploit-db.com/rss.xml"},
     {"name": "github_advisories","url": "https://github.com/advisories.atom"},
 

@@ -1,7 +1,7 @@
 """
 threat_actor_extractor.py
 -------------------------
-ONE JOB: Read claude_analysis.threat_actors from parsed_articles,
+ONE JOB: Read ai_analysis.threat_actors from parsed_articles,
 write one row per actor into the threat_actors table.
 No API calls - pure data transformation.
 """
@@ -20,8 +20,9 @@ def main():
 
     articles = (
         db.table("parsed_articles")
-        .select("id, claude_analysis")
+        .select("id, ai_analysis")
         .eq("actor_status", "pending")
+        .order("parsed_at")
         .limit(BATCH_SIZE)
         .execute()
         .data
@@ -31,7 +32,7 @@ def main():
 
     for article in articles:
         article_id = article["id"]
-        actors = article["claude_analysis"].get("threat_actors", [])
+        actors = article["ai_analysis"].get("threat_actors", [])
 
         try:
             if actors:

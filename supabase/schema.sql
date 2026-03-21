@@ -3,6 +3,45 @@
 -- Run this in Supabase SQL Editor before first pipeline run
 -- ============================================================
 
+-- Required for RAG vector search
+create extension if not exists vector;
+
+-- -------------------------------------------------------
+
+create table mitre_techniques (
+    id              uuid primary key default gen_random_uuid(),
+    technique_id    text not null unique,   -- e.g. T1566.001
+    name            text not null,
+    tactic          text not null,
+    description     text not null,
+    embedding       vector(768) not null,   -- text-embedding-004 dims
+    updated_at      timestamptz not null default now()
+);
+
+create index on mitre_techniques using hnsw (embedding vector_cosine_ops);
+
+-- Similarity search function used by article_parser.py
+create or replace function match_mitre_techniques(
+    query_embedding vector(768),
+    match_count     int default 5
+)
+returns table (
+    technique_id text,
+    name         text,
+    tactic       text,
+    similarity   float
+)
+language sql stable as $$
+    select
+        technique_id,
+        name,
+        tactic,
+        1 - (embedding <=> query_embedding) as similarity
+    from mitre_techniques
+    order by embedding <=> query_embedding
+    limit match_count;
+$$;
+
 create table raw_articles (
     id              uuid primary key default gen_random_uuid(),
     source_feed     text not null,
@@ -28,7 +67,7 @@ create table parsed_articles (
     url             text not null,
     published_at    timestamptz,
     summary         text,
-    claude_analysis jsonb not null,
+    ai_analysis     jsonb not null,
     vuln_status     text not null default 'pending',
     method_status   text not null default 'pending',
     strategy_status text not null default 'pending',
@@ -40,6 +79,8 @@ create table parsed_articles (
 create index on parsed_articles (vuln_status);
 create index on parsed_articles (method_status);
 create index on parsed_articles (strategy_status);
+create index on parsed_articles (actor_status);
+create index on parsed_articles (incident_status);
 create index on parsed_articles (raw_article_id);
 
 -- -------------------------------------------------------
@@ -128,3 +169,47 @@ create index on incidents (attack_type);
 create index on incidents (sector);
 create index on incidents (incident_date desc);
 create index on incidents (parsed_article_id);
+
+-- -------------------------------------------------------
+
+create table ai_validations (
+    id                  uuid primary key default gen_random_uuid(),
+    parsed_article_id   uuid not null references parsed_articles(id),
+    source_table        text not null,      -- 'methodologies' or 'vulnerabilities'
+    source_row_id       uuid not null,      -- id in the source table
+    field_type          text not null,      -- 'mitre_id' or 'cve_id'
+    predicted_value     text not null,      -- what LLM predicted
+    is_valid            boolean not null,   -- does it exist in the real DB
+    validated_at        timestamptz not null default now()
+);
+
+create index on ai_validations (parsed_article_id);
+create index on ai_validations (field_type, is_valid);
+create index on ai_validations (source_row_id);
+
+-- -------------------------------------------------------
+
+create table review_queue (
+    id                  uuid primary key default gen_random_uuid(),
+    parsed_article_id   uuid not null references parsed_articles(id),
+    review_type         text not null,      -- 'mitre_no_match'
+    behavior_text       text not null,      -- elgesio aprašymas kurio nepavyko susieti
+    gemma_suggestion    text,               -- ką Gemma manė kad tai yra (haliucinacija)
+    rag_candidates      text[],             -- kokie 5 kandidatai buvo pateikti
+    status              text not null default 'pending',  -- pending, reviewed, dismissed
+    reviewed_at         timestamptz,
+    reviewer_note       text,
+    created_at          timestamptz not null default now()
+);
+
+create index on review_queue (status);
+create index on review_queue (parsed_article_id);
+
+-- ============================================================
+-- MIGRATION: run this if upgrading an existing database
+-- (skip if creating fresh schema)
+-- ============================================================
+-- alter table parsed_articles rename column claude_analysis to ai_analysis;
+-- create index on parsed_articles (actor_status);
+-- create index on parsed_articles (incident_status);
+-- create index on parsed_articles (incident_status);
